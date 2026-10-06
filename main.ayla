@@ -1,0 +1,200 @@
+import rl
+import conv
+
+keep (
+    White = rl.NewColor(255, 255, 255, 255)
+    LightGray = rl.NewColor(200, 200, 200, 255)
+    Blue = rl.NewColor(0, 0, 255, 255)
+    Black = rl.NewColor(0, 0, 0, 255)
+    Yellow = rl.NewColor(255, 255, 0, 255)
+    Green = rl.NewColor(0, 255, 0, 255)
+)
+
+rl.SetWindowFlags(
+    rl.FlagWindowResizable,
+)
+rl.InitWindow(1040, 1200, "Calculatrice")
+rl.SetExitKey(rl.KeyEsc)
+
+type Calculator struct {
+    Display   string
+    Grid *Grid
+}
+
+type Grid struct {
+    Rows []*Row
+}
+
+type Row struct {
+    Buttons []*Button
+}
+
+type Button struct {
+    Text      string
+    Position  rl.Vector2
+    Size      rl.Vector2
+    Color     rl.Color
+    TextColor rl.Color
+    OnClick   fun()
+}
+
+fun (c *Calculator) Draw() {
+    c.Grid.Draw()
+    c.DrawDisplay()
+}
+
+fun (g *Grid) Draw() {
+    for _, r := range g.Rows {
+        r.Draw()
+    }
+}
+
+fun (r *Row) Draw() {
+    for _, b := range r.Buttons {
+        b.Draw()
+    }
+}
+
+fun (b *Button) Hovered() (bool) {
+    mouse := rl.GetMousePosition()
+
+    give mouse.X >= b.Position.X && mouse.X <= b.Position.X + b.Size.X && mouse.Y >= b.Position.Y && mouse.Y <= b.Position.Y + b.Size.Y
+}
+
+fun (b *Button) Pressed() (bool) {
+    give b.Hovered() && rl.IsMousePressed(rl.MouseLeft)
+}
+
+fun (b *Button) Draw() {
+    color := b.Color
+
+    ayla b.Hovered() {
+        color = LightGray
+
+        ayla b.Pressed() {
+            color = Yellow
+
+            ayla b.OnClick != nil {
+                b.OnClick()
+            }
+        }
+    }
+
+    rl.DrawRectangle(b.Position, b.Size, color)
+    rl.DrawText(b.Text, rl.Vector2{X: b.Position.X + b.Size.X / 2, Y: b.Position.Y + b.Size.Y / 2 - 30}, 50, b.TextColor)
+}
+
+say btnTemplate = Button{
+    Text: "",
+    Position: rl.Vector2{X: 0, Y: 800},
+    Size: rl.Vector2{X: 260, Y: 200},
+    Color: Blue,
+    TextColor: Black,
+}
+
+fun (c *Calculator) AddRow(row int, y float, labels []string, colors []rl.Color) {
+    for col, text := range labels {
+        btn := btnTemplate
+        btn.Text = text
+        btn.Position.X = float(col) * 260
+        btn.Position.Y = y
+        btn.Color = colors[col]
+
+        ayla text != "" {
+            btn.OnClick = fun() {
+                c.AppendDigit(text)
+            }
+        }
+
+        c.Grid.Rows[row].Buttons = append(c.Grid.Rows[row].Buttons, &btn)
+    }
+}
+
+fun (c *Calculator) InitRows() {
+    for col, text := range []string{"0", ".", "="} {
+        btn := btnTemplate
+        btn.Text = text
+        btn.Position.Y = 1000
+        ayla text == "=" {
+            btn.OnClick = fun() {
+                c.Calculate()
+            }
+        } elen {
+            btn.OnClick = fun() {
+                c.AppendDigit(text)
+            }
+        }
+
+        ayla col == 0 {
+            btn.Position.X = 0
+            btn.Size.X = 250 * 2 + 20
+        } elen ayla col == 1 {
+            btn.Position.X = 520
+        } elen {
+            btn.Position.X = 780
+            btn.Color = Green
+        }
+
+        c.Grid.Rows[0].Buttons = append(c.Grid.Rows[0].Buttons, &btn)
+    }
+
+    c.AddRow(1, 800, []string{"1", "2", "3", "+"}, []rl.Color{Blue, Blue, Blue, Green})
+    c.AddRow(2, 600, []string{"4", "5", "6", "-"}, []rl.Color{Blue, Blue, Blue, Green})
+    c.AddRow(3, 400, []string{"7", "8", "9", "*"}, []rl.Color{Blue, Blue, Blue, Green})
+    c.AddRow(4, 200, []string{"", "", "", "/"}, []rl.Color{White, White, White, Green})
+}
+
+fun (c *Calculator) DrawDisplay() {
+    pos := rl.Vector2{X: 20, Y: 20}
+    size := rl.Vector2{X: 1020, Y: 150}
+
+    rl.DrawRectangle(pos, size, LightGray)
+    rl.DrawRectangleLines(pos, size, Black)
+
+    text := c.Display
+    ayla text == "" {
+        text = "0"
+    }
+
+    rl.DrawText(
+        text,
+        rl.Vector2{
+            X: pos.X + size.X - 30 - float(rl.MeasureText(text, 60)),
+            Y: pos.Y + 45,
+        },
+        60,
+        Black,
+    )
+}
+
+fun (c *Calculator) AppendDigit(d string) {
+    c.Display = c.Display + d
+}
+
+fun (c *Calculator) Clear() {
+    c.Display = ""
+}
+
+fun (c *Calculator) Calculate() {
+    res := eval(c.Display)
+    c.Display = conv.String(res)
+}
+
+Calc := &Calculator{
+    Grid: &Grid{
+        Rows: []*Row{
+            &Row{},
+            &Row{},
+            &Row{},
+            &Row{},
+            &Row{},
+        },
+    },
+}
+
+Calc.InitRows()
+while !rl.ShouldClose() {
+    rl.Clear(White)
+    Calc.Draw()
+    rl.Present()
+}
